@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Кредитний трекер</title>
+<style>
+:root{
+  --bg:#f2f2f7;--bg2:#e8ecf7;--card:rgba(255,255,255,.62);--card-b:rgba(255,255,255,.7);--line:rgba(60,60,67,.14);
+  --tx:#1d1d1f;--tx2:#6e6e73;--accent:#0a84ff;--green:#30b050;--orange:#ff9f0a;--red:#ff453a;
+  --shadow:0 8px 30px rgba(0,0,0,.07);--inp:rgba(120,120,128,.1);--hd:rgba(246,246,250,.82);--blob1:#9ec5ff;--blob2:#ffc6e0;
+  color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#000;--bg2:#0b0b14;--card:rgba(44,44,50,.55);--card-b:rgba(255,255,255,.09);--line:rgba(255,255,255,.12);
+  --tx:#f5f5f7;--tx2:#98989f;--accent:#0a84ff;--green:#32d74b;--orange:#ff9f0a;--shadow:0 8px 30px rgba(0,0,0,.45);
+  --inp:rgba(120,120,128,.24);--hd:rgba(28,28,32,.85);--blob1:#143a7a;--blob2:#5a1b45;color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#000;--bg2:#0b0b14;--card:rgba(44,44,50,.55);--card-b:rgba(255,255,255,.09);--line:rgba(255,255,255,.12);
+  --tx:#f5f5f7;--tx2:#98989f;--accent:#0a84ff;--green:#32d74b;--orange:#ff9f0a;--shadow:0 8px 30px rgba(0,0,0,.45);
+  --inp:rgba(120,120,128,.24);--hd:rgba(28,28,32,.85);--blob1:#143a7a;--blob2:#5a1b45;color-scheme:dark}
+*{box-sizing:border-box}
+html{height:100%;scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;min-height:100%;background:var(--bg);color:var(--tx);
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro Text","Helvetica Neue",Arial,sans-serif;
+  -webkit-font-smoothing:antialiased;letter-spacing:-.01em;transition:background .4s,color .4s}
+.blobs{position:fixed;inset:0;z-index:-1;overflow:hidden;background:linear-gradient(160deg,var(--bg),var(--bg2))}
+.blobs i{position:absolute;border-radius:50%;filter:blur(90px);opacity:.55}
+.blobs i:nth-child(1){width:420px;height:420px;background:var(--blob1);top:-120px;left:-80px}
+.blobs i:nth-child(2){width:380px;height:380px;background:var(--blob2);bottom:-100px;right:-60px}
+.wrap{max-width:1180px;margin:0 auto;padding:28px 20px 60px}
+header{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:22px}
+h1{font-size:clamp(28px,5vw,40px);font-weight:700;letter-spacing:-.03em;margin:0}
+h1 small{display:block;font-size:15px;font-weight:500;color:var(--tx2);letter-spacing:0;margin-top:4px}
+.card{background:var(--card);border:1px solid var(--card-b);border-radius:22px;box-shadow:var(--shadow);
+  -webkit-backdrop-filter:saturate(180%) blur(24px);backdrop-filter:saturate(180%) blur(24px)}
+.theme{width:44px;height:44px;border-radius:50%;border:1px solid var(--card-b);background:var(--card);color:var(--tx);
+  font-size:19px;cursor:pointer;backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);transition:transform .25s}
+.theme:hover{transform:rotate(18deg) scale(1.06)}.theme:active{transform:scale(.92)}
+.params{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;padding:18px;margin-bottom:16px}
+label.f{display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--tx2);text-transform:uppercase;letter-spacing:.04em}
+.inw{position:relative}
+.inw span{position:absolute;right:12px;top:50%;transform:translateY(-50%);color:var(--tx2);font-size:13px;pointer-events:none}
+input[type=number],input[type=month]{width:100%;height:44px;border-radius:12px;border:1px solid transparent;background:var(--inp);
+  color:var(--tx);font:inherit;font-size:17px;font-weight:600;padding:0 44px 0 14px;outline:none;transition:.2s;font-variant-numeric:tabular-nums}
+input[type=month]{padding-right:12px}
+input:focus{border-color:var(--accent);box-shadow:0 0 0 4px rgba(10,132,255,.2);background:transparent}
+.kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-bottom:16px}
+.kpi{padding:18px;transition:transform .25s}.kpi:hover{transform:translateY(-3px)}
+.kpi .l{font-size:12px;font-weight:600;color:var(--tx2);text-transform:uppercase;letter-spacing:.04em}
+.kpi .v{font-size:clamp(20px,2.2vw,26px);font-weight:700;margin-top:8px;letter-spacing:-.02em;font-variant-numeric:tabular-nums;transition:opacity .2s}
+.kpi .s{font-size:13px;color:var(--tx2);margin-top:4px}
+.kpi.ring{display:flex;align-items:center;gap:14px}
+.ring svg{flex:none;transform:rotate(-90deg)}
+.ring circle{fill:none;stroke-width:9;stroke-linecap:round}
+.ring .bg{stroke:var(--inp)}.ring .fg{stroke:var(--green);transition:stroke-dashoffset .8s cubic-bezier(.2,.8,.2,1)}
+.ring .pct{font-size:24px;font-weight:700}
+.bar{padding:16px 18px;margin-bottom:16px}
+.bar .top{display:flex;justify-content:space-between;font-size:14px;color:var(--tx2);margin-bottom:10px;font-weight:500}
+.track{height:10px;border-radius:6px;background:var(--inp);overflow:hidden}
+.track b{display:block;height:100%;width:0;border-radius:6px;background:linear-gradient(90deg,var(--accent),var(--green));transition:width .7s cubic-bezier(.2,.8,.2,1)}
+.warn{display:none;padding:12px 16px;border-radius:14px;background:rgba(255,69,58,.14);color:var(--red);font-weight:600;font-size:14px;margin-bottom:16px}
+.tools{display:flex;justify-content:space-between;align-items:center;padding:14px 18px;gap:10px;flex-wrap:wrap}
+.tools h2{margin:0;font-size:20px;letter-spacing:-.02em}
+.btn{height:36px;padding:0 16px;border-radius:18px;border:none;background:var(--inp);color:var(--accent);font:inherit;font-size:14px;font-weight:600;cursor:pointer;transition:.2s}
+.btn:hover{background:rgba(10,132,255,.18)}.btn:active{transform:scale(.95)}
+.tw{max-height:62vh;overflow:auto;border-top:1px solid var(--line);border-radius:0 0 22px 22px}
+table{width:100%;border-collapse:separate;border-spacing:0;min-width:780px;font-variant-numeric:tabular-nums}
+th{position:sticky;top:0;z-index:2;background:var(--hd);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+  font-size:11.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--tx2);font-weight:600;text-align:right;padding:12px 14px;border-bottom:1px solid var(--line)}
+td{padding:9px 14px;text-align:right;border-bottom:1px solid var(--line);font-size:15px;transition:background .2s,opacity .3s}
+th:first-child,td:first-child,th:nth-child(2),td:nth-child(2){text-align:left}
+tbody tr{transition:background .2s}tbody tr:hover{background:rgba(10,132,255,.07)}
+tr.paid td{opacity:.55}tr.paid td.ck,tr.paid td.st{opacity:1}
+td .pi{width:130px;height:36px;font-size:15px;padding:0 30px 0 10px;text-align:right;border-radius:10px}
+td .inw{display:inline-block}
+td .inw span{right:9px;font-size:11px}
+.ed .pi{border-color:var(--orange)}
+.int{color:var(--orange)}.pr{color:var(--accent)}
+.tag{display:inline-block;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:600}
+.tag.p{background:rgba(48,176,80,.18);color:var(--green)}.tag.w{background:var(--inp);color:var(--tx2)}.tag.l{background:rgba(255,159,10,.2);color:var(--orange)}
+.sw{position:relative;display:inline-block;width:46px;height:28px}
+.sw input{opacity:0;position:absolute;inset:0;width:100%;height:100%;margin:0;cursor:pointer;z-index:1}
+.sw i{position:absolute;inset:0;border-radius:14px;background:rgba(120,120,128,.3);transition:.25s}
+.sw i::after{content:"";position:absolute;top:2px;left:2px;width:24px;height:24px;border-radius:50%;background:#fff;box-shadow:0 2px 5px rgba(0,0,0,.3);transition:.25s cubic-bezier(.3,1.4,.5,1)}
+.sw input:checked+i{background:var(--green)}.sw input:checked+i::after{transform:translateX(18px)}
+.flash{animation:fl .5s}
+@keyframes fl{from{opacity:.3;transform:translateY(3px)}to{opacity:1;transform:none}}
+.sync{display:flex;align-items:center;gap:8px;height:36px;padding:0 14px;border-radius:18px;background:var(--card);border:1px solid var(--card-b);font-size:13px;font-weight:600;color:var(--tx2);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px)}
+.sync b{font-weight:600}.sync i{width:8px;height:8px;border-radius:50%;background:var(--tx2);transition:background .3s}
+.sync[data-s=ok] i{background:var(--green)}.sync[data-s=err] i{background:var(--red)}
+.sync[data-s=busy] i{background:var(--orange);animation:pl 1s infinite}
+@keyframes pl{50%{opacity:.3}}
+@media(max-width:900px){.params{grid-template-columns:1fr 1fr}.kpis{grid-template-columns:1fr 1fr}.kpi.ring{grid-column:span 2}}
+</style>
+</head>
+<body>
+<div class="blobs"><i></i><i></i></div>
+<div class="wrap">
+  <header>
+    <h1>Кредитний трекер<small>Графік платежів і прогрес виплат</small></h1>
+    <div style="display:flex;align-items:center;gap:10px"><span class="sync" id="sync" data-s="busy"><i></i><b id="syncTxt">Підключення…</b></span><button class="theme" id="theme" aria-label="Змінити тему">🌙</button></div>
+  </header>
+
+  <section class="card params">
+    <label class="f">Початкова сума<div class="inw"><input type="number" id="amt" value="139397" min="0" step="100"><span>PLN</span></div></label>
+    <label class="f">Річна ставка<div class="inw"><input type="number" id="rate" value="3.5" min="0" step="0.1"><span>%</span></div></label>
+    <label class="f">Загальний місячний платіж<div class="inw"><input type="number" id="pay" value="2500" min="0" step="50"><span>PLN</span></div></label>
+    <label class="f">Початок виплат<div class="inw"><input type="month" id="start"></div></label>
+  </section>
+
+  <div class="warn" id="warn">Платіж не покриває відсотки — кредит ніколи не буде погашено. Збільште платіж.</div>
+
+  <section class="kpis">
+    <div class="card kpi"><div class="l">Сума кредиту</div><div class="v" id="kLoan"></div><div class="s" id="kRate"></div></div>
+    <div class="card kpi"><div class="l">Загальні відсотки</div><div class="v int" id="kInt"></div><div class="s" id="kIntPct"></div></div>
+    <div class="card kpi"><div class="l">Загальна сума виплат</div><div class="v" id="kTot"></div><div class="s">тіло + відсотки</div></div>
+    <div class="card kpi"><div class="l">Тривалість</div><div class="v" id="kDur"></div><div class="s" id="kEnd"></div></div>
+    <div class="card kpi ring">
+      <svg width="84" height="84" viewBox="0 0 84 84"><circle class="bg" cx="42" cy="42" r="35"/><circle class="fg" id="fg" cx="42" cy="42" r="35" stroke-dasharray="219.9" stroke-dashoffset="219.9"/></svg>
+      <div><div class="l" style="font-size:12px;font-weight:600;color:var(--tx2);text-transform:uppercase;letter-spacing:.04em">Прогрес виплат</div><div class="pct" id="kPct">0%</div><div class="s" style="font-size:13px;color:var(--tx2)" id="kPaidN"></div></div>
+    </div>
+  </section>
+
+  <section class="card bar">
+    <div class="top"><span>Погашено з тіла кредиту</span><span id="barTxt"></span></div>
+    <div class="track"><b id="barFill"></b></div>
+  </section>
+
+  <section class="card">
+    <div class="tools"><h2>Графік платежів</h2><button class="btn" id="reset">Скинути індивідуальні платежі</button></div>
+    <div class="tw">
+      <table>
+        <thead><tr><th>№</th><th>Місяць</th><th>Початковий залишок</th><th>Загальний місячний платіж</th><th>Відсотки</th><th>Тіло кредиту</th><th>Залишок після сплати</th><th>Статус</th><th>Сплачено</th></tr></thead>
+        <tbody id="body"></tbody>
+      </table>
+    </div>
+  </section>
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+const r2=x=>Math.round((x+Number.EPSILON)*100)/100;
+const fmt=x=>x.toLocaleString('uk-UA',{minimumFractionDigits:2,maximumFractionDigits:2});
+const fmtP=x=>fmt(x)+' PLN';
+const over={}, paid=new Set();
+let sched=[], stuck=false;
+
+const now=new Date();
+$('start').value=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
+
+function monthLabel(i){
+  const [y,m]=$('start').value.split('-').map(Number);
+  const d=new Date((y||now.getFullYear()),(m||1)-1+i,1);
+  const s=d.toLocaleDateString('uk-UA',{month:'long',year:'numeric'});
+  return s.charAt(0).toUpperCase()+s.slice(1);
+}
+
+function build(){
+  const A=Math.max(0,parseFloat($('amt').value)||0);
+  const R=Math.max(0,parseFloat($('rate').value)||0);
+  const G=Math.max(0,parseFloat($('pay').value)||0);
+  sched=[];stuck=false;
+  let bal=r2(A),i=0;
+  while(bal>0){
+    if(i>=720){stuck=true;break;}
+    const planned=over[i]!==undefined?over[i]:G;
+    const interest=r2(bal*R/100/12);
+    const principal=Math.max(0,Math.min(bal,r2(planned-interest)));
+    const after=Math.max(0,r2(bal-principal));
+    const eff=r2(interest+principal);
+    sched.push({i,start:bal,planned,interest,principal,after,eff,edited:over[i]!==undefined,last:after===0});
+    bal=after;i++;
+  }
+  return {A,R,G};
+}
+
+function render(focusIdx,caret){
+  const {A,R}=build();
+  const n=sched.length;
+  const totInt=r2(sched.reduce((s,r)=>s+r.interest,0));
+  const totPaid=r2(sched.reduce((s,r)=>s+r.eff,0));
+  $('kLoan').textContent=fmtP(A);
+  $('kRate').textContent='ставка '+R.toLocaleString('uk-UA')+'% річних';
+  $('kInt').textContent=fmtP(totInt);
+  $('kIntPct').textContent=A?(totInt/A*100).toFixed(1)+'% від суми кредиту':'';
+  $('kTot').textContent=fmtP(totPaid);
+  if(stuck){$('kDur').textContent='> 60 р.';$('kEnd').textContent='не погашається';}
+  else{
+    const y=Math.floor(n/12),m=n%12;
+    $('kDur').textContent=n+' міс.';
+    $('kEnd').textContent=(y?y+' р. ':'')+(m?m+' міс. · ':(y?'· ':''))+(n?'до '+monthLabel(n-1):'');
+  }
+  $('warn').style.display=stuck?'block':'none';
+
+  let paidPr=0,paidN=0;
+  sched.forEach(r=>{if(paid.has(r.i)){paidPr+=r.principal;paidN++;}});
+  paidPr=r2(paidPr);
+  const pct=A?Math.min(100,paidPr/A*100):0;
+  $('fg').style.strokeDashoffset=219.9*(1-pct/100);
+  $('kPct').textContent=pct.toFixed(1)+'%';
+  $('kPaidN').textContent='Сплачено '+paidN+' з '+n+' міс.';
+  $('barFill').style.width=pct+'%';
+  $('barTxt').textContent=fmtP(paidPr)+' з '+fmtP(A);
+
+  $('body').innerHTML=sched.map(r=>{
+    const p=paid.has(r.i);
+    const tag=p?'<span class="tag p">Сплачено</span>':r.last?'<span class="tag l">Останній</span>':'<span class="tag w">Очікується</span>';
+    return `<tr class="${p?'paid':''} ${r.edited?'ed':''}">
+      <td>${r.i+1}</td><td>${monthLabel(r.i)}</td><td>${fmt(r.start)}</td>
+      <td><div class="inw"><input class="pi" type="number" min="0" step="50" data-i="${r.i}" value="${r.planned}"><span>PLN</span></div></td>
+      <td class="int">${fmt(r.interest)}</td><td class="pr">${fmt(r.principal)}</td><td><b>${fmt(r.after)}</b></td>
+      <td class="st">${tag}</td>
+      <td class="ck"><label class="sw"><input type="checkbox" data-c="${r.i}" ${p?'checked':''}><i></i></label></td></tr>`;
+  }).join('');
+
+  if(focusIdx!==undefined){
+    const el=document.querySelector(`input[data-i="${focusIdx}"]`);
+    if(el){el.focus();try{el.setSelectionRange(caret,caret);}catch(e){}}
+  }
+  document.querySelectorAll('.kpi .v').forEach(e=>{e.classList.remove('flash');void e.offsetWidth;e.classList.add('flash');});
+}
+
+$('body').addEventListener('input',e=>{
+  const t=e.target;
+  if(t.dataset.i!==undefined){
+    const v=parseFloat(t.value);
+    const i=+t.dataset.i;
+    if(isNaN(v)||v<0)delete over[i]; else over[i]=v;
+    let c=t.value.length;
+    render(i,c);
+    queueSave();
+  }
+});
+$('body').addEventListener('change',e=>{
+  const t=e.target;
+  if(t.dataset.c!==undefined){
+    const i=+t.dataset.c;
+    t.checked?paid.add(i):paid.delete(i);
+    render();
+    queueSave();
+  }
+});
+['amt','rate','start','pay'].forEach(id=>$(id).addEventListener('input',()=>{render();queueSave();}));
+$('reset').addEventListener('click',()=>{const ks=Object.keys(over).map(Number);ks.forEach(k=>delete over[k]);render();if(ks.length)queueSave();});
+
+/* ---------- Синхронізація з Vercel KV через /api ---------- */
+let loaded=false,saving=false,dirty=false,saveTimer=null;
+function setSync(s,t){$('sync').dataset.s=s;$('syncTxt').textContent=t;}
+function getState(){
+  return {amount:parseFloat($('amt').value)||0,rate:parseFloat($('rate').value)||0,payment:parseFloat($('pay').value)||0,
+    start:$('start').value,overrides:{...over},paid:[...paid]};
+}
+function applyState(s){
+  $('amt').value=s.amount;$('rate').value=s.rate;$('pay').value=s.payment;
+  if(s.start)$('start').value=s.start;
+  for(const k in over)delete over[k];
+  paid.clear();
+  Object.entries(s.overrides||{}).forEach(([k,v])=>{over[+k]=Number(v);});
+  (s.paid||[]).forEach(i=>paid.add(+i));
+}
+async function loadState(){
+  setSync('busy','Підключення…');
+  try{
+    const r=await fetch('/api/get-loan',{cache:'no-store'});
+    if(!r.ok)throw new Error(r.status);
+    applyState(await r.json());
+    loaded=true;
+    render();
+    setSync('ok','Синхронізовано з Vercel KV');
+  }catch(e){console.error(e);setSync('err','Немає зʼєднання · повторити');}
+}
+function queueSave(){
+  if(!loaded)return;
+  setSync('busy','Збереження…');
+  clearTimeout(saveTimer);
+  saveTimer=setTimeout(flush,400);
+}
+async function flush(){
+  if(saving){dirty=true;return;}
+  saving=true;dirty=false;let ok=true;
+  try{
+    const r=await fetch('/api/save-loan',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(getState()),keepalive:true});
+    if(!r.ok)throw new Error(r.status);
+  }catch(e){console.error(e);ok=false;}
+  saving=false;
+  if(dirty)return flush();
+  setSync(ok?'ok':'err',ok?'Синхронізовано з Vercel KV':'Помилка збереження · повторити');
+}
+$('sync').style.cursor='pointer';
+$('sync').addEventListener('click',()=>{if($('sync').dataset.s==='err')loaded?flush():loadState();});
+
+const th=$('theme');
+function setTheme(t){document.documentElement.dataset.theme=t;th.textContent=t==='dark'?'☀️':'🌙';}
+setTheme(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light');
+th.addEventListener('click',()=>setTheme(document.documentElement.dataset.theme==='dark'?'light':'dark'));
+
+render();
+loadState();
+</script>
+</body>
+</html>
