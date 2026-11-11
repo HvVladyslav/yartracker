@@ -135,8 +135,18 @@ td.ck{grid-row:5;grid-column:2;display:flex;justify-content:flex-end;align-items
 td.ck::before{display:none}
 td .inw{display:block}
 td .pi{width:100%;height:44px;font-size:16px;text-align:left}
+tbody tr{-webkit-tap-highlight-color:transparent}
+tr.paid td:nth-child(2),tr.paid td.st{cursor:pointer}
+tr.paid td.st::after{content:"";width:8px;height:8px;border-right:2px solid var(--tx2);border-bottom:2px solid var(--tx2);transform:rotate(45deg);margin:-3px 2px 0 12px;transition:transform .25s,margin .25s}
+tr.paid:not(.collapsed) td.st::after{transform:rotate(-135deg);margin-top:3px}
+tr.collapsed{padding:8px 14px;cursor:pointer;grid-template-columns:1fr auto}
+tr.collapsed td:nth-child(2){white-space:nowrap;font-size:15px}
+tr.collapsed td:not(:nth-child(2)):not(.st){display:none}
+tr.collapsed td:nth-child(2){grid-row:1;grid-column:1}
+tr.collapsed td.st{grid-row:1;grid-column:2;justify-content:flex-end;border-top:0;margin:0;padding:5px 0}
 }
 </style>
+<script>try{var t=localStorage.getItem("theme");if(t==="dark"||t==="light")document.documentElement.dataset.theme=t}catch(e){}</script>
 </head>
 <body>
 <div class="blobs"><i></i><i></i></div>
@@ -187,7 +197,7 @@ const $=id=>document.getElementById(id);
 const r2=x=>Math.round((x+Number.EPSILON)*100)/100;
 const fmt=x=>x.toLocaleString('uk-UA',{minimumFractionDigits:2,maximumFractionDigits:2});
 const fmtP=x=>fmt(x)+' PLN';
-const over={}, paid=new Set();
+const over={}, paid=new Set(), expanded=new Set();
 let sched=[], stuck=false;
 
 const now=new Date();
@@ -250,7 +260,7 @@ function render(focusIdx,caret){
   $('body').innerHTML=sched.map(r=>{
     const p=paid.has(r.i);
     const tag=p?'<span class="tag p">Сплачено</span>':r.last?'<span class="tag l">Останній</span>':'<span class="tag w">Очікується</span>';
-    return `<tr class="${p?'paid':''} ${r.edited?'ed':''}">
+    return `<tr class="${p?'paid':''} ${p&&!expanded.has(r.i)?'collapsed':''} ${r.edited?'ed':''}">
       <td>${r.i+1}</td><td data-n="${r.i+1}">${monthLabel(r.i)}</td><td data-l="Початковий залишок">${fmt(r.start)}</td>
       <td data-l="Загальний місячний платіж"><div class="inw"><input class="pi" type="number" min="0" step="50" data-i="${r.i}" value="${r.planned}"><span>PLN</span></div></td>
       <td class="int" data-l="Відсотки">${fmt(r.interest)}</td><td class="pr" data-l="Тіло кредиту">${fmt(r.principal)}</td><td data-l="Залишок після сплати"><b>${fmt(r.after)}</b></td>
@@ -281,15 +291,26 @@ $('body').addEventListener('change',e=>{
   if(t.dataset.c!==undefined){
     const i=+t.dataset.c;
     t.checked?paid.add(i):paid.delete(i);
+    expanded.delete(i);
     render();
     queueSave();
   }
+});
+$('body').addEventListener('click',e=>{
+  if(!matchMedia('(max-width:760px)').matches)return;
+  const tr=e.target.closest('tr');
+  if(!tr||!tr.classList.contains('paid'))return;
+  if(e.target.closest('input,label,.sw'))return;
+  if(!tr.classList.contains('collapsed')&&!e.target.closest('td:nth-child(2),td.st'))return;
+  const i=+tr.querySelector('[data-c]').dataset.c;
+  expanded.has(i)?expanded.delete(i):expanded.add(i);
+  render();
 });
 ['amt','rate','start','pay'].forEach(id=>$(id).addEventListener('input',()=>{render();queueSave();}));
 $('reset').addEventListener('click',()=>{const ks=Object.keys(over).map(Number);ks.forEach(k=>delete over[k]);render();if(ks.length)queueSave();});
 
 /* ---------- Синхронізація з Vercel KV через /api ---------- */
-let loaded=false,saving=false,dirty=false,saveTimer=null;
+let loaded=false,saving=false,dirty=false,pending=false,saveTimer=null,lastRefresh=0;
 function setSync(s,t){$('sync').dataset.s=s;$('syncTxt').textContent=t;}
 function getState(){
   return {amount:parseFloat($('amt').value)||0,rate:parseFloat($('rate').value)||0,payment:parseFloat($('pay').value)||0,
@@ -317,12 +338,13 @@ async function loadState(){
 function queueSave(){
   if(!loaded)return;
   setSync('busy','Збереження…');
+  pending=true;
   clearTimeout(saveTimer);
   saveTimer=setTimeout(flush,400);
 }
 async function flush(){
   if(saving){dirty=true;return;}
-  saving=true;dirty=false;let ok=true;
+  pending=false;saving=true;dirty=false;let ok=true;
   try{
     const r=await fetch('/api/save-loan',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(getState()),keepalive:true});
     if(!r.ok)throw new Error(r.status);
@@ -331,13 +353,40 @@ async function flush(){
   if(dirty)return flush();
   setSync(ok?'ok':'err',ok?'Синхронізовано з Vercel KV':'Помилка збереження · повторити');
 }
+function canon(s,fb){
+  const o=s.overrides||{};
+  return JSON.stringify([Number(s.amount),Number(s.rate),Number(s.payment),s.start||fb,
+    Object.keys(o).map(Number).sort((a,b)=>a-b).map(k=>k+':'+Number(o[k])),
+    [...(s.paid||[])].map(Number).sort((a,b)=>a-b)]);
+}
+async function refresh(){
+  if(!loaded){loadState();return;}
+  if(pending||saving||Date.now()-lastRefresh<2000)return;
+  const a=document.activeElement;
+  if(a&&a.tagName==='INPUT'&&a.type!=='checkbox')return;
+  lastRefresh=Date.now();
+  try{
+    const r=await fetch('/api/get-loan',{cache:'no-store'});
+    if(!r.ok)return;
+    const s=await r.json();
+    if(pending||saving)return;
+    const cur=getState();
+    if(canon(s,cur.start)===canon(cur,cur.start)){if($('sync').dataset.s==='err')setSync('ok','Синхронізовано з Vercel KV');return;}
+    applyState(s);render();setSync('ok','Синхронізовано з Vercel KV');
+  }catch(e){console.error(e);}
+}
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)refresh();});
+window.addEventListener('pageshow',refresh);
+window.addEventListener('focus',refresh);
+setInterval(()=>{if(!document.hidden)refresh();},30000);
 $('sync').style.cursor='pointer';
 $('sync').addEventListener('click',()=>{if($('sync').dataset.s==='err')loaded?flush():loadState();});
 
 const th=$('theme');
 function setTheme(t){document.documentElement.dataset.theme=t;th.textContent=t==='dark'?'☀️':'🌙';}
-setTheme(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light');
-th.addEventListener('click',()=>setTheme(document.documentElement.dataset.theme==='dark'?'light':'dark'));
+let savedTheme=null;try{savedTheme=localStorage.getItem('theme');}catch(e){}
+setTheme(savedTheme==='dark'||savedTheme==='light'?savedTheme:(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light'));
+th.addEventListener('click',()=>{const t=document.documentElement.dataset.theme==='dark'?'light':'dark';setTheme(t);try{localStorage.setItem('theme',t);}catch(e){}});
 
 render();
 loadState();
